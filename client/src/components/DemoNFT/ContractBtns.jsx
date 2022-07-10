@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { toast } from 'react-toastify';
 import useEth from "../../contexts/EthContext/useEth";
 
 function ContractBtns({ setValue }) {
   const { state: { contract, accounts } } = useEth();
-  const [inputValue, setInputValue] = useState("");
+  const [tokenId, setTokenId] = useState("");
 
   const handleInputChange = e => {
     if (/^\d+$|^$/.test(e.target.value)) {
@@ -11,12 +12,22 @@ function ContractBtns({ setValue }) {
     }
   };
 
-  const read = async () => {
-    const value = await contract.methods.read().call({ from: accounts[0] });
-    setValue(value);
-  };
+   const mint = async e => {
+       if (e.target.tagName === "INPUT") {
+           return;
+       }
+       if (tokenId === "") {
+           alert("Please enter a value to write.");
+           return;
+       }
 
-  const write = async e => {
+       const newValue = parseInt(tokenId);
+       const value = await contract.methods.mint(newValue).call({ from: accounts[0] });
+       setTokenId(value);
+    };
+
+
+  const transferFrom = async e => {
     if (e.target.tagName === "INPUT") {
       return;
     }
@@ -32,12 +43,29 @@ function ContractBtns({ setValue }) {
   return (
     <div className="btns">
 
-      <button onClick={read}>
-        create()
+      <button onClick={mint}>
+        mint(<input
+               type="text"
+               placeholder="new url"
+               value={inputURL}
+               onChange={handleURLChange}
+             />)
       </button>
 
-      <div onClick={write} className="input-btn">
-        changeUrl(<input
+      <div onClick={transferFrom} className="input-btn">
+        transferFrom(<input
+          type="text"
+          placeholder="new url"
+          value={inputValue}
+          onChange={handleInputChange}
+        />
+        <input
+          type="text"
+          placeholder="new url"
+          value={inputValue}
+          onChange={handleInputChange}
+        />
+        <input
           type="text"
           placeholder="new url"
           value={inputValue}

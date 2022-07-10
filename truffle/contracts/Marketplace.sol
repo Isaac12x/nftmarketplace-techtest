@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 // code from https://trufflesuite.com/guides/nft-marketplace/#my-nftsjs
 // modifications mine.
 
@@ -7,8 +7,9 @@ pragma solidity >=0.8.1 <0.9.0;
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "./IERC4907.sol";
 
-contract FuncMarketplace is ReentrancyGuard {
+contract FuncMarketplace is ReentrancyGuard{
   using Counters for Counters.Counter;
 
   Counters.Counter private _nftsSold;
@@ -56,20 +57,20 @@ contract FuncMarketplace is ReentrancyGuard {
     address owner,
     uint256 price,
     uint256 durationInMinutes   /// @dev terms
-  )
+                  );
 
   constructor() {
     _marketOwner = payable(msg.sender);
-    
   }
 
   // List the NFT on the marketplace
   function listNft(address _nftContract, uint256 _tokenId, uint256 _salePrice, uint256 _rentPrice) public payable nonReentrant {
-    require(_price > 0, "Price must be at least 1 wei");
+      require(_salePrice > 0, "Price must be at least 1 wei");
+      require(_rentPrice > 0, "Price must be at least 1 wei");
     require(msg.value == LISTING_FEE, "Not enough ether for listing fee");
 
-    pendingWithdrawls[msg.sender] = msg.value - LISTING_FEE;
-    pendingWithdrawls[_marketOwner] = msg.value;
+    pendingWithdrawals[payable(msg.sender)] = msg.value - LISTING_FEE;
+    pendingWithdrawals[_marketOwner] = msg.value;
 
     IERC721(_nftContract).transferFrom(msg.sender, address(this), _tokenId);    
     _nftCount.increment();
@@ -79,13 +80,13 @@ contract FuncMarketplace is ReentrancyGuard {
       _tokenId, 
       payable(msg.sender),
       payable(address(this)),
-      _price,
+      _salePrice,
       _rentPrice,
       true
 
     );
 
-    emit NFTListed(_nftContract, _tokenId, msg.sender, address(this), _price);
+    emit NFTListed(_nftContract, _tokenId, msg.sender, address(this), _salePrice);
   }
 
   // Buy an NFT
@@ -121,15 +122,22 @@ contract FuncMarketplace is ReentrancyGuard {
     emit NFTListed(_nftContract, _tokenId, msg.sender, address(this), _price);
   }
 
-  function rentNft(address _nftContract, uint256 _tokenId, uint256 _price, uint256 _durationInMinutes) public payable nonReentrant {
+  function rentNft(address _nftContract, uint256 _tokenId, uint256 _price, uint64 _expiry) public payable nonReentrant {
       require(_price > 0, "Price must be at least 1 wei");
-      require(msg.value == RENT_FEE, "Not enough ether for the rent fee");
+      require(msg.value >= (RENT_FEE + _price), "Not enough ether to cover the rent and fee");
+      NFT storage nft = _idToNFT[_tokenId];
 
-      // @dev @TODO implement the logic
+      pendingWithdrawals[payable(nft.owner)] = msg.value - _price; // this should be the pricy
+      if (msg.value > RENT_FEE) {
+          pendingWithdrawals[payable(msg.sender)] = msg.value - RENT_FEE; // reminder
+      }
+      pendingWithdrawals[_marketOwner] = msg.value; /// fee
 
 
-      _nftsRented.increment()
-      emit NFTRented(_nftContract, _tokenId, msg.sender, address(this), _price, _durationInMinutes)
+      IERC4907(_nftContract).setUser(_tokenId, msg.sender, _expiry);
+
+      _nftsRented.increment();
+      emit NFTRented(_nftContract, _tokenId, msg.sender, address(this), _price, _expiry);
   }
 
   function getListingFee() public view returns (uint256) {
@@ -218,15 +226,18 @@ contract FuncMarketplace is ReentrancyGuard {
 
 
   /// @dev we want to be able to update fees to reflect changes in circumstances
-  function updateListingFee(uint256 _newPrice) public onlyOwner {
+  function updateListingFee(uint256 _newPrice) public {
+      require(msg.sender == _marketOwner, "You can't change the LISTING_FEE");
       LISTING_FEE = _newPrice;
   }
 
-  function updateRentFee(uint256 _newPrice) public onlyOwner {
+  function updateRentFee(uint256 _newPrice) public {
+      require(msg.sender == _marketOwner, "You can't change the RENT_FEE");
       RENT_FEE = _newPrice;
   }
 
-  function updateSaleFee(uint256 _newPrice) public onlyOwner {
+  function updateSaleFee(uint256 _newPrice) public {
+      require(msg.sender == _marketOwner, "You can't change the SALE_FEE");
       SALE_FEE = _newPrice;
   }
 
@@ -235,7 +246,7 @@ contract FuncMarketplace is ReentrancyGuard {
   function withdraw() public {
       uint256 amount = pendingWithdrawals[msg.sender];
       pendingWithdrawals[msg.sender] = 0;
-      msg.sender.transfer(amount);
+      payable(msg.sender).transfer(amount);
   }
 
  

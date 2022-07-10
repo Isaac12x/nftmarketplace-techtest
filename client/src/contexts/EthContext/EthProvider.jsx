@@ -10,32 +10,39 @@ function EthProvider({ children }) {
 
   const init = useCallback(
     async artifact => {
-      if (artifact) {
+        if (artifact) {
         const web3 = new Web3(Web3.givenProvider || "ws://local host:8545");
         const accounts = await web3.eth.requestAccounts();
         const networkID = await web3.eth.net.getId();
-        const { abi } = artifact;
-        let address, contract;
+        const { abi1, abi2 } = artifact;
+            let address, nftContract, marketplaceContract;
         try {
           address = artifact.networks[networkID].address;
-          contract = new web3.eth.Contract(abi, address);
-            setConnection({connected: true})
+          nftContract = new web3.eth.Contract(abi1, process.env.NFTADDRESS);
+          marketplaceContract = new web3.eth.Contract(abi2, process.env.MARKETPLACEADDRESS);
+          setConnection({connected: true});
         } catch (err) {
-            setConnection({errored: true, connected: false});
+          setConnection({errored: true, connected: false});
           console.error(err);
         }
         dispatch({
           type: actions.init,
-          data: { artifact, web3, accounts, networkID, contract }
+            data: { artifact, web3, accounts, networkID, nftContract, marketplaceContract }
         });
       }
     }, []);
 
+  
+
   useEffect(() => {
     const tryInit = async () => {
       try {
-        const artifact = require("../../contracts/SimpleStorage.json");
-        init(artifact);
+        const nft = require("../../contracts/Configured.json");
+          const marketplace = require("../../contracts/FuncMarketplace.json");
+         init(nft, marketplace);
+
+
+          // TODO: needs refinement
           window.localStorage.setItem('connection', JSON.stringify(connection));
           if (connection.errored === false && connection.showConnected === 0) {
               toast.success("Metamask connected");
