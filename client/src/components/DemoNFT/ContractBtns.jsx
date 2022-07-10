@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { toast } from 'react-toastify';
 import useEth from "../../contexts/EthContext/useEth";
 
 function ContractBtns({ setValue }) {
   const { state: { contract, accounts } } = useEth();
-  const [tokenId, setTokenId] = useState("");
+  const [inputValue, setInputValue] = useState("");
 
   const handleInputChange = e => {
     if (/^\d+$|^$/.test(e.target.value)) {
@@ -12,22 +11,12 @@ function ContractBtns({ setValue }) {
     }
   };
 
-   const mint = async e => {
-       if (e.target.tagName === "INPUT") {
-           return;
-       }
-       if (tokenId === "") {
-           alert("Please enter a value to write.");
-           return;
-       }
+  const read = async () => {
+    const value = await contract.methods.read().call({ from: accounts[0] });
+    setValue(value);
+  };
 
-       const newValue = parseInt(tokenId);
-       const value = await contract.methods.mint(newValue).call({ from: accounts[0] });
-       setTokenId(value);
-    };
-
-
-  const transferFrom = async e => {
+  const write = async e => {
     if (e.target.tagName === "INPUT") {
       return;
     }
@@ -36,38 +25,20 @@ function ContractBtns({ setValue }) {
       return;
     }
     const newValue = parseInt(inputValue);
-
     await contract.methods.write(newValue).send({ from: accounts[0] });
   };
 
   return (
     <div className="btns">
 
-      <button onClick={mint}>
-        mint(<input
-               type="text"
-               placeholder="new url"
-               value={inputURL}
-               onChange={handleURLChange}
-             />)
+      <button onClick={read}>
+        read()
       </button>
 
-      <div onClick={transferFrom} className="input-btn">
-        transferFrom(<input
+      <div onClick={write} className="input-btn">
+        write(<input
           type="text"
-          placeholder="new url"
-          value={inputValue}
-          onChange={handleInputChange}
-        />
-        <input
-          type="text"
-          placeholder="new url"
-          value={inputValue}
-          onChange={handleInputChange}
-        />
-        <input
-          type="text"
-          placeholder="new url"
+          placeholder="uint"
           value={inputValue}
           onChange={handleInputChange}
         />)
